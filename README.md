@@ -49,16 +49,17 @@ actually has — and to tell you exactly what those are.
 
 ## Getting the app
 
-### Option A — download the APK from GitHub Actions (no tooling needed)
-> **One-time setup:** the agent's credential isn't allowed to create workflow
-> files, so the CI config ships as [`ci/android-build.yml`](ci/android-build.yml).
+### Option A — download the APK from GitHub Releases (no tooling needed)
+> **One-time setup (~30s):** the agent's credential isn't allowed to create
+> workflow files, so the CI config ships as [`ci/android-build.yml`](ci/android-build.yml).
 > To enable it: open
-> [this link](https://github.com/MAVERICKx1902/ULTRACAM-/new/arena/01a070aa-ultracam?filename=.github/workflows/android-build.yml),
+> [this link](https://github.com/MAVERICKx1902/ULTRACAM-/new/main?filename=.github/workflows/android-build.yml),
 > paste the contents of `ci/android-build.yml`, and commit — done.
 
-1. Push (or merge) this branch — the **Build ULTRACAM APK** workflow then runs on every push.
-2. Open the repo → **Actions** → latest **Build ULTRACAM APK** run → **Artifacts** → `ULTRACAM-debug-apk`.
-3. Unzip and sideload the APK (`Settings → allow unknown apps` for your browser first).
+Once enabled, every push to `main` builds the app and publishes a fresh
+`ULTRACAM-v0.1.0-debug.apk` to [**Releases**](https://github.com/MAVERICKx1902/ULTRACAM-/releases)
+(and to the Actions artifacts). Download it, open it, allow "install unknown
+apps" when prompted, grant camera access, and shoot.
 
 ### Option B — build it yourself
 ```bash

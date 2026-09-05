@@ -50,7 +50,13 @@ actually has — and to tell you exactly what those are.
 ## Getting the app
 
 ### Option A — download the APK from GitHub Actions (no tooling needed)
-1. Push (or merge) this branch — the **Build ULTRACAM APK** workflow runs on every push.
+> **One-time setup:** the agent's credential isn't allowed to create workflow
+> files, so the CI config ships as [`ci/android-build.yml`](ci/android-build.yml).
+> To enable it: open
+> [this link](https://github.com/MAVERICKx1902/ULTRACAM-/new/arena/01a070aa-ultracam?filename=.github/workflows/android-build.yml),
+> paste the contents of `ci/android-build.yml`, and commit — done.
+
+1. Push (or merge) this branch — the **Build ULTRACAM APK** workflow then runs on every push.
 2. Open the repo → **Actions** → latest **Build ULTRACAM APK** run → **Artifacts** → `ULTRACAM-debug-apk`.
 3. Unzip and sideload the APK (`Settings → allow unknown apps` for your browser first).
 

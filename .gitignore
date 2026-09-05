@@ -28,3 +28,4 @@ captures/
 # Misc
 .DS_Store
 *.log
+.github/workflows/

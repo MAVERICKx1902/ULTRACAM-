@@ -1,0 +1,6 @@
+<paths>
+    <!-- Captures on Android 8.x are written to getExternalFilesDir(Pictures)/ULTRACAM -->
+    <external-files-path
+        name="ultracam_pictures"
+        path="Pictures/ULTRACAM/" />
+</paths>

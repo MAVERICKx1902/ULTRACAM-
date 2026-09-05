@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Glass prism triangle -->
+    <path
+        android:pathData="M40,36 L40,72 L71,54 Z"
+        android:fillColor="#101B2E"
+        android:strokeColor="#D9ECFF"
+        android:strokeWidth="2" />
+
+    <!-- Incoming white beam -->
+    <path
+        android:pathData="M14,52 L40,51 L40,56 L14,57 Z"
+        android:fillColor="#F2F8FF" />
+
+    <!-- Dispersed spectrum: cyan / violet / magenta -->
+    <path
+        android:pathData="M71,54 L96,38 L96,43 L71,54 Z"
+        android:fillColor="#66E5FF" />
+    <path
+        android:pathData="M71,54 L97,50 L97,56 L71,54 Z"
+        android:fillColor="#8E7BFF" />
+    <path
+        android:pathData="M71,54 L96,65 L96,70 L71,54 Z"
+        android:fillColor="#FF5FD2" />
+</vector>

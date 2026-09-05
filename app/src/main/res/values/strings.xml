@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ULTRACAM</string>
+    <string name="tagline">Liquid optics. Raw hardware.</string>
+    <string name="grant_camera">GRANT CAMERA ACCESS</string>
+    <string name="open_settings">OPEN SETTINGS</string>
+</resources>

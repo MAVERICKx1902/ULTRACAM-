@@ -4,9 +4,24 @@ import android.hardware.camera2.CameraCharacteristics
 import android.util.Size
 import kotlin.math.roundToInt
 
+enum class AspectRatioOption(val label: String, val ratioFloat: Float) {
+    RATIO_4_3("4:3", 4f / 3f),
+    RATIO_16_9("16:9", 16f / 9f),
+    RATIO_1_1("1:1", 1f),
+    RATIO_FULL("FULL", 0f);
+
+    fun next(): AspectRatioOption = when (this) {
+        RATIO_4_3 -> RATIO_16_9
+        RATIO_16_9 -> RATIO_1_1
+        RATIO_1_1 -> RATIO_FULL
+        RATIO_FULL -> RATIO_4_3
+    }
+}
+
 /** A physical/logical camera exposed by the device. */
 data class LensInfo(
     val cameraId: String,
+    val physicalCameraId: String? = null,
     val facing: Int,
     val label: String,
     val focalEquiv35mm: Float,

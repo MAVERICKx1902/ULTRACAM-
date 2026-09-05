@@ -7,7 +7,10 @@ import com.ultracam.app.camera.LensInfo
 import com.ultracam.app.camera.ResolutionOption
 
 enum class CaptureMode(val label: String) {
-    AUTO("AUTO"),
+    CINEMATIC("CINEMATIC"),
+    VIDEO("VIDEO"),
+    PHOTO("PHOTO"),
+    PORTRAIT("PORTRAIT"),
     PRO("PRO")
 }
 
@@ -51,13 +54,29 @@ data class FocusFx(
 
 enum class Haptic { TICK, CONFIRM, WARN }
 
+enum class VideoResOption(val label: String, val width: Int, val height: Int) {
+    RES_720P("720p", 1280, 720),
+    RES_1080P("1080p", 1920, 1080),
+    RES_4K("4K", 3840, 2160);
+
+    fun next(): VideoResOption = when (this) {
+        RES_720P -> RES_1080P
+        RES_1080P -> RES_4K
+        RES_4K -> RES_720P
+    }
+}
+
 data class UiState(
     // camera lifecycle
     val cameraReady: Boolean = false,
     val cameraError: String? = null,
 
     // mode + manual block
-    val mode: CaptureMode = CaptureMode.AUTO,
+    val mode: CaptureMode = CaptureMode.PHOTO,
+    val aspectRatio: com.ultracam.app.camera.AspectRatioOption = com.ultracam.app.camera.AspectRatioOption.RATIO_4_3,
+    val videoRes: VideoResOption = VideoResOption.RES_1080P,
+    val videoFps: Int = 60,
+    val showZoomWheel: Boolean = false,
     val manualExposure: Boolean = false,
     val manualIso: Int = 400,
     val manualShutterNs: Long = 16_666_667L,
@@ -94,7 +113,7 @@ data class UiState(
     val soundOn: Boolean = true,
     val timerSec: Int = 0,
     val quality: CaptureQuality = CaptureQuality.QUALITY,
-    val fpsTarget: Int = 0,
+    val fpsTarget: Int = 60,
     val showSettings: Boolean = false,
 
     // capture fx
@@ -102,6 +121,8 @@ data class UiState(
     val bursting: Boolean = false,
     val burstCount: Int = 0,
     val countdown: Int = 0,
+    val recordingVideo: Boolean = false,
+    val recordingDurationSec: Int = 0,
     val lastPhoto: ImageBitmap? = null,
     val lastPhotoUri: Uri? = null
 )

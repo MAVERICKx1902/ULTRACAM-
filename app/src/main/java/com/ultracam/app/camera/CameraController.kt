@@ -8,9 +8,9 @@ import android.net.Uri
 import android.os.Build
 import android.util.Range
 import android.util.Size
-import androidx.camera.camera2.Camera2CameraControl
-import androidx.camera.camera2.Camera2CameraInfo
-import androidx.camera.camera2.Camera2Interop
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -18,8 +18,8 @@ import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
-import androidx.camera.core.ResolutionSelector
-import androidx.camera.core.ResolutionStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.ZoomState
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -144,72 +144,156 @@ class CameraController(private val context: Context) {
     // ------------------------------------------------------------- enumeration
 
     private fun enumerateLenses(p: ProcessCameraProvider): List<LensInfo> {
-        return p.availableCameraInfos.mapNotNull { info ->
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
+            ?: return emptyList()
+        val result = mutableListOf<LensInfo>()
+        val seenKeys = mutableSetOf<String>()
+
+        val availableIds = try {
+            cameraManager.cameraIdList
+        } catch (_: Throwable) {
+            emptyArray()
+        }
+
+        for (id in availableIds) {
             try {
-                val c2 = Camera2CameraInfo.from(info)
-                val facing = c2.getCameraCharacteristic(CameraCharacteristics.LENS_FACING)
-                    ?: return@mapNotNull null
-                val focal = c2
-                    .getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
-                    ?.firstOrNull() ?: return@mapNotNull null
-                val sensor = c2
-                    .getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
-                    ?: return@mapNotNull null
-                val pixels = c2
-                    .getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
-                val equiv = 36f * focal / sensor.width
+                val chars = cameraManager.getCameraCharacteristics(id)
+                val facing = chars.get(CameraCharacteristics.LENS_FACING) ?: continue
+                val focals = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                val focal = focals?.firstOrNull() ?: 4.5f
+                val sensor = chars.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+                val pixels = chars.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+                val sensorWidth = sensor?.width?.takeIf { it > 0 } ?: 6.4f
+                val equiv = 36f * focal / sensorWidth
                 val mp = pixels?.let { it.width * it.height / 1_000_000f } ?: 0f
-                LensInfo(
-                    cameraId = c2.cameraId,
-                    facing = facing,
-                    label = if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
+
+                val info = p.availableCameraInfos.firstOrNull {
+                    Camera2CameraInfo.from(it).cameraId == id
+                }
+                val hasFlash = info?.hasFlashUnit() ?: (facing == CameraCharacteristics.LENS_FACING_BACK)
+
+                val key = "logical_$id"
+                if (seenKeys.add(key)) {
+                    val label = if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
                         "FRONT"
                     } else {
                         CameraMath.focalBucket(equiv)
-                    },
-                    focalEquiv35mm = equiv,
-                    megapixels = mp,
-                    hasFlash = info.hasFlashUnit()
-                )
+                    }
+                    result += LensInfo(
+                        cameraId = id,
+                        physicalCameraId = null,
+                        facing = facing,
+                        label = label,
+                        focalEquiv35mm = equiv,
+                        megapixels = mp,
+                        hasFlash = hasFlash
+                    )
+                }
+
+                // Enumerate physical cameras if this is a logical multi-camera
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val physicalIds = chars.physicalCameraIds
+                    for (physId in physicalIds) {
+                        val physKey = "phys_${id}_$physId"
+                        if (seenKeys.contains(physKey)) continue
+                        val physChars = try {
+                            cameraManager.getCameraCharacteristics(physId)
+                        } catch (_: Throwable) {
+                            null
+                        } ?: continue
+                        val physFacing = physChars.get(CameraCharacteristics.LENS_FACING) ?: facing
+                        val physFocals = physChars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                        val physFocal = physFocals?.firstOrNull() ?: focal
+                        val physSensor = physChars.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: sensor
+                        val physPixels = physChars.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE) ?: pixels
+                        val physSensorWidth = physSensor?.width?.takeIf { it > 0 } ?: sensorWidth
+                        val physEquiv = 36f * physFocal / physSensorWidth
+                        val physMp = physPixels?.let { it.width * it.height / 1_000_000f } ?: mp
+
+                        val physLabel = if (physFacing == CameraCharacteristics.LENS_FACING_FRONT) {
+                            "FRONT ($physId)"
+                        } else {
+                            CameraMath.focalBucket(physEquiv)
+                        }
+                        seenKeys.add(physKey)
+                        result += LensInfo(
+                            cameraId = id,
+                            physicalCameraId = physId,
+                            facing = physFacing,
+                            label = physLabel,
+                            focalEquiv35mm = physEquiv,
+                            megapixels = physMp,
+                            hasFlash = hasFlash
+                        )
+                    }
+                }
             } catch (_: Throwable) {
-                null
             }
-        }.sortedWith(
-            compareBy({ it.isFront }, { it.focalEquiv35mm })
-        )
+        }
+        return result.sortedWith(compareBy({ it.isFront }, { it.focalEquiv35mm }))
     }
 
     fun resolutionsFor(lens: LensInfo): List<ResolutionOption> {
-        val p = provider ?: return emptyList()
-        val info = p.availableCameraInfos.firstOrNull {
-            Camera2CameraInfo.from(it).cameraId == lens.cameraId
-        } ?: return emptyList()
-        val map = Camera2CameraInfo.from(info)
-            .getCameraCharacteristic(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? android.hardware.camera2.CameraManager
             ?: return emptyList()
-        val sizes = try {
+        val targetId = lens.physicalCameraId ?: lens.cameraId
+        val chars = try {
+            cameraManager.getCameraCharacteristics(targetId)
+        } catch (_: Throwable) {
+            try {
+                cameraManager.getCameraCharacteristics(lens.cameraId)
+            } catch (_: Throwable) {
+                null
+            }
+        } ?: return emptyList()
+
+        val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            ?: return emptyList()
+
+        val normalSizes = try {
             map.getOutputSizes(ImageFormat.JPEG)
         } catch (_: Throwable) {
             null
-        } ?: return emptyList()
-        return sizes.asSequence()
-            .filter { it.width >= 1280 && it.height >= 720 }
-            .sortedByDescending { it.width.toLong() * it.height }
-            .take(8)
-            .map {
-                ResolutionOption(
-                    size = it,
-                    label = "${it.width}×${it.height}",
-                    aspectLabel = CameraMath.aspectLabel(it.width, it.height),
-                    megapixels = it.width * it.height / 1_000_000f
-                )
+        } ?: emptyArray()
+
+        val highResSizes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                map.getHighResolutionOutputSizes(ImageFormat.JPEG)
+            } catch (_: Throwable) {
+                null
+            } ?: emptyArray()
+        } else emptyArray()
+
+        val pixelArray = chars.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+        val activeArray = chars.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+        val maxSensorSize = pixelArray ?: activeArray?.let { Size(it.width(), it.height()) }
+
+        val combinedList = (normalSizes + highResSizes).toMutableList()
+        if (maxSensorSize != null && maxSensorSize.width >= 1920 && maxSensorSize.height >= 1080) {
+            if (!combinedList.any { it.width == maxSensorSize.width && it.height == maxSensorSize.height }) {
+                combinedList += maxSensorSize
             }
-            .toList()
+        }
+
+        val allSizes = combinedList
+            .filter { it.width >= 1280 && it.height >= 720 }
+            .distinctBy { "${it.width}x${it.height}" }
+            .sortedByDescending { it.width.toLong() * it.height }
+
+        return allSizes.map { size ->
+            val mp = size.width * size.height / 1_000_000f
+            val mpLabel = if (mp >= 10f) "${mp.toInt()}MP" else String.format(java.util.Locale.US, "%.1fMP", mp)
+            ResolutionOption(
+                size = size,
+                label = "${size.width}×${size.height} ($mpLabel)",
+                aspectLabel = CameraMath.aspectLabel(size.width, size.height),
+                megapixels = mp
+            )
+        }
     }
 
     private fun defaultResolution(lens: LensInfo, p: ProcessCameraProvider): Size? {
         val all = resolutionsFor(lens)
-        // Prefer the largest 4:3 size: most sensors expose their full readout there.
         return all.firstOrNull { it.aspectLabel == "4:3" }?.size
             ?: all.firstOrNull()?.size
     }
@@ -217,10 +301,15 @@ class CameraController(private val context: Context) {
     private fun selectorForCurrentLens(): CameraSelector {
         val lens = lenses.getOrNull(lensIndex) ?: return CameraSelector.DEFAULT_BACK_CAMERA
         return CameraSelector.Builder()
-            .addCameraFilter { cameras ->
-                LinkedHashSet(
-                    cameras.filter { Camera2CameraInfo.from(it).cameraId == lens.cameraId }
-                )
+            .addCameraFilter { cameraInfos ->
+                val match = cameraInfos.filter { Camera2CameraInfo.from(it).cameraId == lens.cameraId }
+                if (match.isNotEmpty()) {
+                    match
+                } else {
+                    cameraInfos.filter {
+                        Camera2CameraInfo.from(it).getCameraCharacteristic(CameraCharacteristics.LENS_FACING) == lens.facing
+                    }
+                }
             }
             .build()
     }
@@ -243,6 +332,7 @@ class CameraController(private val context: Context) {
                 .setAspectRatioStrategy(CameraMath.aspectStrategyFor(resolution))
                 .build()
         )
+        Camera2Interop.Extender(builder).apply { bakeManual(this) }
         return builder.build()
     }
 
@@ -271,12 +361,17 @@ class CameraController(private val context: Context) {
                 .setAspectRatioStrategy(CameraMath.aspectStrategyFor(resolution))
                 .build()
         )
+        Camera2Interop.Extender(builder).apply { bakeManual(this) }
         val built = builder.build()
-        analyzer?.let { built.setImageAnalyzer(analysisExecutor, it) }
+        analyzer?.let { built.setAnalyzer(analysisExecutor, it) }
         return built
     }
 
     private fun bakeManual(ext: Camera2Interop.Extender<*>) {
+        val lens = lenses.getOrNull(lensIndex)
+        if (lens?.physicalCameraId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ext.setPhysicalCameraId(lens.physicalCameraId)
+        }
         if (manual.exposureOn) {
             ext.setCaptureRequestOption(
                 CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF
@@ -314,7 +409,7 @@ class CameraController(private val context: Context) {
         try {
             detachZoomObserver()
             p.unbindAll()
-            imageAnalysis?.clearImageAnalyzer()
+            imageAnalysis?.clearAnalyzer()
             preview = buildPreview()
             imageCapture = buildImageCapture()
             imageAnalysis = buildAnalysis()
@@ -452,7 +547,7 @@ class CameraController(private val context: Context) {
             ?.sorted()
             ?: emptyList()
         fpsRanges = c2.getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
-            ?: emptyList()
+            ?.toList() ?: emptyList()
         val resolutions = resolutionsFor(lens)
 
         return CameraSnapshot(
@@ -494,7 +589,7 @@ class CameraController(private val context: Context) {
             CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL -> "EXTERNAL"
             else -> "UNKNOWN"
         }
-        val oisModes = char(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION_MODES)
+        val oisModes = c2.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
         val ois = if (oisModes != null && oisModes.isNotEmpty()) "OIS" else "NONE"
         val pixelPitch = if (sensor != null && pixels != null && pixels.width > 0) {
             sensor.width * 1000f / pixels.width
@@ -620,9 +715,7 @@ class CameraController(private val context: Context) {
             val point = view.meteringPointFactory.createPoint(x, y)
             val action = FocusMeteringAction.Builder(
                 point,
-                FocusMeteringAction.FLAG_AF,
-                FocusMeteringAction.FLAG_AE,
-                FocusMeteringAction.FLAG_AWB
+                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE or FocusMeteringAction.FLAG_AWB
             )
                 .setAutoCancelDuration(4, TimeUnit.SECONDS)
                 .build()

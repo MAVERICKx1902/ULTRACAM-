@@ -4,7 +4,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.params.RggbChannelVector
 import android.util.Size
 import androidx.camera.core.AspectRatio
-import androidx.camera.core.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ln
@@ -149,6 +149,14 @@ object CameraMath {
             abs(ratio - 21f / 9f) < 0.05f -> "21:9"
             else -> "$rw:$rh"
         }
+    }
+
+    fun aspectStrategyForOption(option: AspectRatioOption, size: Size?): AspectRatioStrategy {
+        val aspect = when (option) {
+            AspectRatioOption.RATIO_4_3, AspectRatioOption.RATIO_1_1 -> AspectRatio.RATIO_4_3
+            AspectRatioOption.RATIO_16_9, AspectRatioOption.RATIO_FULL -> AspectRatio.RATIO_16_9
+        }
+        return AspectRatioStrategy(aspect, AspectRatioStrategy.FALLBACK_RULE_AUTO)
     }
 
     /** Chooses the CameraX aspect strategy closest to the still-capture size. */

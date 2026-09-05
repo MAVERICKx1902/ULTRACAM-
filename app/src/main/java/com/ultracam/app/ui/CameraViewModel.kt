@@ -19,15 +19,17 @@ import com.ultracam.app.camera.ManualSettings
 import com.ultracam.app.sensors.Attitude
 import com.ultracam.app.sensors.AttitudeSensor
 import com.ultracam.app.util.Prefs
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.resume
+import kotlin.coroutines.resume
 
 /**
  * Single source of truth for the camera UI. Bridges [CameraController]
@@ -107,7 +109,7 @@ class CameraViewModel(application: Application) :
     }
 
     private fun initialState(): UiState {
-        val mode = if (prefs.mode == "PRO") CaptureMode.PRO else CaptureMode.AUTO
+        val mode = if (prefs.mode == "PRO") CaptureMode.PRO else CaptureMode.PHOTO
         val flash = when (prefs.flashMode) {
             "AUTO" -> FlashMode.AUTO
             "ON" -> FlashMode.ON
@@ -224,9 +226,26 @@ class CameraViewModel(application: Application) :
     }
 
     fun setFps(fps: Int) {
-        _ui.update { it.copy(fpsTarget = fps) }
+        _ui.update { it.copy(fpsTarget = fps, videoFps = fps) }
         prefs.fpsTarget = fps
         controller.setFps(fps)
+    }
+
+    fun cycleVideoRes() {
+        val next = _ui.value.videoRes.next()
+        _ui.update { it.copy(videoRes = next) }
+        hapticFx.tryEmit(Haptic.TICK)
+    }
+
+    fun cycleVideoFps() {
+        val next = when (_ui.value.videoFps) {
+            30 -> 60
+            60 -> 120
+            else -> 30
+        }
+        _ui.update { it.copy(videoFps = next, fpsTarget = next) }
+        controller.setFps(next)
+        hapticFx.tryEmit(Haptic.TICK)
     }
 
     // ------------------------------------------------------------- toggles
@@ -302,6 +321,31 @@ class CameraViewModel(application: Application) :
 
     fun setShowSettings(show: Boolean) {
         _ui.update { it.copy(showSettings = show) }
+    }
+
+    fun setAspectRatio(option: com.ultracam.app.camera.AspectRatioOption) {
+        _ui.update { it.copy(aspectRatio = option) }
+        hapticFx.tryEmit(Haptic.TICK)
+    }
+
+    fun cycleAspectRatio() {
+        val next = _ui.value.aspectRatio.next()
+        setAspectRatio(next)
+    }
+
+    fun setShowZoomWheel(show: Boolean) {
+        _ui.update { it.copy(showZoomWheel = show) }
+    }
+
+    fun toggleZoomWheel() {
+        _ui.update { it.copy(showZoomWheel = !it.showZoomWheel) }
+        hapticFx.tryEmit(Haptic.TICK)
+    }
+
+    fun setZoomRatio(ratio: Float) {
+        val clamped = ratio.coerceIn(_ui.value.zoomMin, _ui.value.zoomMax)
+        zoom.value = clamped
+        controller.setZoomRatio(clamped)
     }
 
     fun dismissError() {
@@ -415,10 +459,40 @@ class CameraViewModel(application: Application) :
 
     // ------------------------------------------------------------- capture
 
+    private var videoTimerJob: Job? = null
+
     fun onShutterTap() {
         if (SystemClock.uptimeMillis() - lastBurstEnd < 600) return
         if (bursting) return
-        capture()
+        
+        val s = _ui.value
+        if (s.mode == CaptureMode.VIDEO || s.mode == CaptureMode.CINEMATIC) {
+            toggleVideoRecording()
+        } else {
+            capture()
+        }
+    }
+
+    private fun toggleVideoRecording() {
+        val s = _ui.value
+        if (s.recordingVideo) {
+            videoTimerJob?.cancel()
+            _ui.update { it.copy(recordingVideo = false, recordingDurationSec = 0) }
+            hapticFx.tryEmit(Haptic.CONFIRM)
+            viewModelScope.launch { performCapture() }
+        } else {
+            hapticFx.tryEmit(Haptic.CONFIRM)
+            _ui.update { it.copy(recordingVideo = true, recordingDurationSec = 0) }
+            videoTimerJob?.cancel()
+            videoTimerJob = viewModelScope.launch {
+                var elapsed = 0
+                while (isActive) {
+                    delay(1000)
+                    elapsed++
+                    _ui.update { it.copy(recordingDurationSec = elapsed) }
+                }
+            }
+        }
     }
 
     fun onShutterHold() {

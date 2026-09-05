@@ -13,14 +13,18 @@ import androidx.compose.ui.unit.sp
 
 // ---------------------------------------------------------------- palette
 
-val Void = Color(0xFF05070D)
-val VoidSoft = Color(0xFF0A0F1A)
+val Void = Color(0xFF0F0E13)
+val VoidSoft = Color(0xFF1D1B20)
+val PixelYellow = Color(0xFFFABB05)
+val PixelPillBg = Color(0xCC1F1F23)
+val PixelPurpleAccent = Color(0xFFE8DEF8)
+val PixelPurpleDark = Color(0xFF1D1B20)
 val GlassWhite = Color(0xFFFFFFFF)
 val PrismCyan = Color(0xFF66E5FF)
 val PrismMagenta = Color(0xFFFF5FD2)
 val PrismViolet = Color(0xFF8E7BFF)
 val PrismAmber = Color(0xFFFFD166)
-val PrismGreen = Color(0xFF4ADE80)
+val PrismGreen = Color(0xFF81C784)
 val PrismRed = Color(0xFFFF6B6B)
 
 // ---------------------------------------------------------------- type

@@ -273,15 +273,16 @@ fun FocusReticleLayer(
         FocusPhase.FAILED -> PrismRed
     }
 
+    val boxSize = 52.dp
     Box(
-        modifier
+        Modifier
             .offset {
                 IntOffset(
-                    (current.x - 44.dp.toPx()).roundToInt(),
-                    (current.y - 44.dp.toPx()).roundToInt()
+                    (current.x - boxSize.toPx() / 2f).roundToInt(),
+                    (current.y - boxSize.toPx() / 2f).roundToInt()
                 )
             }
-            .size(88.dp)
+            .size(boxSize)
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
@@ -292,13 +293,13 @@ fun FocusReticleLayer(
             progress = spin,
             color = ringColor,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(3.dp)
+                .size(boxSize)
+                .padding(2.dp)
         )
-        Canvas(Modifier.fillMaxSize()) {
-            val arm = 14.dp.toPx()
-            val stroke = 2.4f
-            val inset = 16.dp.toPx()
+        Canvas(Modifier.size(boxSize)) {
+            val arm = 10.dp.toPx()
+            val stroke = 2.0f
+            val inset = 10.dp.toPx()
             fun bracket(cx: Float, cy: Float, dx: Float, dy: Float) {
                 drawLine(ringColor, Offset(cx, cy), Offset(cx + dx * arm, cy), stroke)
                 drawLine(ringColor, Offset(cx, cy), Offset(cx, cy + dy * arm), stroke)
@@ -309,7 +310,7 @@ fun FocusReticleLayer(
             bracket(size.width - inset, size.height - inset, -1f, -1f)
             drawCircle(
                 ringColor,
-                radius = 2.4f,
+                radius = 2.0f,
                 center = Offset(size.width / 2f, size.height / 2f)
             )
         }

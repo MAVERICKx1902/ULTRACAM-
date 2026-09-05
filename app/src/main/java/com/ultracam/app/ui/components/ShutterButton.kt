@@ -1,8 +1,13 @@
 package com.ultracam.app.ui.components
 
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,6 +51,17 @@ fun ShutterButton(
     busy: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "busySpin")
+    val spinDegrees by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "spinDegrees"
+    )
+
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -66,15 +82,16 @@ fun ShutterButton(
     Box(
         modifier
             .size(82.dp)
+            .clip(CircleShape)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
+                clip = true
             }
-            .clip(CircleShape)
             .clickable(interactionSource = interaction, indication = null, onClick = onTap),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.size(82.dp)) {
             val ring = 5.dp.toPx()
             val outer = size.minDimension / 2f
             val inner = outer - ring
@@ -133,7 +150,7 @@ fun ShutterButton(
 
             // busy spinner arc
             if (busy) {
-                rotate(clockwise = true) {
+                rotate(degrees = spinDegrees) {
                     drawArc(
                         color = PrismCyan,
                         startAngle = 0f,

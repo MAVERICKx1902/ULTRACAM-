@@ -66,12 +66,12 @@ fun ModeSelector(
         )
         Row {
             ModeLabel(
-                "AUTO",
-                mode == CaptureMode.AUTO,
+                "PHOTO",
+                mode == CaptureMode.PHOTO,
                 Modifier
                     .width(itemWidth)
                     .height(34.dp),
-                onClick = { onSelect(CaptureMode.AUTO) }
+                onClick = { onSelect(CaptureMode.PHOTO) }
             )
             ModeLabel(
                 "PRO",

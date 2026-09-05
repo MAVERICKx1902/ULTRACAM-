@@ -44,8 +44,8 @@ object CaptureSaver {
             val uri = context.contentResolver.insert(collection, values)
                 ?: throw IllegalStateException("MediaStore rejected the image")
             Request(
-                options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, uri).build(),
-                mediaUri = uri,
+                options = ImageCapture.OutputFileOptions.Builder(context.contentResolver, collection, values).build(),
+                mediaUri = null,
                 file = null,
                 name = name
             )
